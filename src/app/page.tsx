@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 
 import ClientList from "@/components/clients/ClientList";
 import ClientSearch from "@/components/clients/ClientSearch";
 import ClientModal from "@/components/clients/ClientModal";
-import Image from "next/image";
+import ImportModal from "@/components/clients/import/ImportModal";
 import type { Client, ClientInput } from "@/types/client";
 
 interface ApiResponse {
@@ -33,6 +34,8 @@ export default function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalKey, setModalKey] = useState(0);
 
+  const [importModalOpen, setImportModalOpen] = useState(false);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -50,7 +53,7 @@ export default function Home() {
           setError(
             error instanceof Error
               ? error.message
-              : "Não foi possível carregar os clientes.",
+              : "Não foi possível carregar os clientes."
           );
         }
       } finally {
@@ -71,7 +74,7 @@ export default function Home() {
     const normalizedSearch = search.trim().toLocaleLowerCase("pt-BR");
 
     return clients.filter((client) =>
-      client.name.toLocaleLowerCase("pt-BR").includes(normalizedSearch),
+      client.name.toLocaleLowerCase("pt-BR").includes(normalizedSearch)
     );
   }, [clients, search]);
 
@@ -86,7 +89,7 @@ export default function Home() {
       setError(
         error instanceof Error
           ? error.message
-          : "Não foi possível carregar os clientes.",
+          : "Não foi possível carregar os clientes."
       );
     } finally {
       setLoading(false);
@@ -132,13 +135,13 @@ export default function Home() {
       if (errors) {
         const messages = Object.entries(errors).flatMap(
           ([field, fieldErrors]) =>
-            fieldErrors.map((message) => `${field}: ${message}`),
+            fieldErrors.map((message) => `${field}: ${message}`)
         );
 
         throw new Error(
           messages.length > 0
             ? messages.join("\n")
-            : result.message || "Não foi possível salvar o cliente.",
+            : result.message || "Não foi possível salvar o cliente."
         );
       }
 
@@ -150,8 +153,8 @@ export default function Home() {
     if (isEditing) {
       setClients((previous) =>
         previous.map((client) =>
-          client._id === savedClient._id ? savedClient : client,
-        ),
+          client._id === savedClient._id ? savedClient : client
+        )
       );
     } else {
       setClients((previous) => [savedClient, ...previous]);
@@ -182,13 +185,23 @@ export default function Home() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={openNewClientModal}
-            className="rounded-lg bg-[#1CF637] px-5 py-3 text-sm font-semibold text-[#0C0C0C] transition hover:bg-[#7CD420]"
-          >
-            + Novo cliente
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setImportModalOpen(true)}
+              className="rounded-lg border border-[#2A2A2A] bg-[#141414] px-5 py-3 text-sm font-semibold text-white transition hover:border-[#1CF637] hover:text-[#1CF637]"
+            >
+              Importar CSV
+            </button>
+
+            <button
+              type="button"
+              onClick={openNewClientModal}
+              className="rounded-lg bg-[#1CF637] px-5 py-3 text-sm font-semibold text-[#0C0C0C] transition hover:bg-[#7CD420]"
+            >
+              + Novo cliente
+            </button>
+          </div>
         </header>
 
         <section className="mb-8 grid gap-4 sm:grid-cols-2">
@@ -257,6 +270,12 @@ export default function Home() {
         client={selectedClient}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
+      />
+
+      <ImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onImportSuccess={() => void loadClients()}
       />
     </main>
   );
