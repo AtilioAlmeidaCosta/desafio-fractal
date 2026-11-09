@@ -123,6 +123,25 @@ export default function Home() {
     const result: ApiResponse = await response.json();
 
     if (!response.ok || !result.success || !result.data) {
+      const errors = (
+        result as ApiResponse & {
+          errors?: Record<string, string[]>;
+        }
+      ).errors;
+
+      if (errors) {
+        const messages = Object.entries(errors).flatMap(
+          ([field, fieldErrors]) =>
+            fieldErrors.map((message) => `${field}: ${message}`),
+        );
+
+        throw new Error(
+          messages.length > 0
+            ? messages.join("\n")
+            : result.message || "Não foi possível salvar o cliente.",
+        );
+      }
+
       throw new Error(result.message || "Não foi possível salvar o cliente.");
     }
 
@@ -147,13 +166,13 @@ export default function Home() {
       <div className="mx-auto max-w-7xl">
         <header className="mb-10 flex flex-col gap-4 border-b border-[#2A2A2A] pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-              <Image
-                src="/logo-250.png"
-                alt="Fractal Security"
-                width={250}
-                height={80}
-                className="h-auto w-48 object-contain"
-              />
+            <Image
+              src="/logo-250.png"
+              alt="Fractal Security"
+              width={250}
+              height={80}
+              className="h-auto w-48 object-contain"
+            />
             <h1 className="text-3xl font-semibold text-white">
               Gestão de clientes
             </h1>

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import connectMongoDB from "@/lib/mongodb";
 import Client from "@/models/Client";
+import { clientSchema } from "@/validators/client";
 
 export async function GET() {
   try {
@@ -35,24 +36,22 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    const { name, phone, email, address } = body;
+    // Valida os dados recebidos utilizando o schema do Zod.
+    const validation = clientSchema.safeParse(body);
 
-    if (!name || !phone || !email || !address) {
+    if (!validation.success) {
       return NextResponse.json(
         {
           success: false,
-          message: "Todos os campos são obrigatórios.",
+          message: "Dados inválidos. Verifique os campos informados.",
+          errors: validation.error.flatten().fieldErrors,
         },
         { status: 400 }
       );
     }
 
-    const client = await Client.create({
-      name,
-      phone,
-      email,
-      address,
-    });
+    // Salva somente os dados aprovados pela validação.
+    const client = await Client.create(validation.data);
 
     return NextResponse.json(
       {

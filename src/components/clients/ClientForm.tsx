@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -8,6 +7,16 @@ interface ClientFormProps {
   client: Client | null;
   onSubmit: (data: ClientInput) => Promise<void>;
   onCancel: () => void;
+}
+interface ApiValidationError {
+  success: false;
+  message: string;
+  errors?: {
+    name?: string[];
+    phone?: string[];
+    email?: string[];
+    address?: string[];
+  };
 }
 
 export default function ClientForm({
@@ -25,9 +34,7 @@ export default function ClientForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  function handleChange(
-    event: React.ChangeEvent<HTMLInputElement>
-  ) {
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = event.target;
 
     setFormData((previous) => ({
@@ -36,9 +43,7 @@ export default function ClientForm({
     }));
   }
 
-  async function handleSubmit(
-    event: React.FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError("");
@@ -49,7 +54,7 @@ export default function ClientForm({
       setError(
         error instanceof Error
           ? error.message
-          : "Não foi possível salvar o cliente."
+          : "Não foi possível salvar o cliente.",
       );
     } finally {
       setLoading(false);
@@ -124,9 +129,20 @@ export default function ClientForm({
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-[#E36650]">
-          {error}
-        </p>
+        <div
+          role="alert"
+          className="rounded-lg border border-[#E36650]/40 bg-[#E36650]/10 p-3"
+        >
+          <p className="mb-2 text-sm font-semibold text-[#E36650]">
+            Verifique os seguintes campos:
+          </p>
+
+          <ul className="list-inside list-disc space-y-1 text-sm text-[#D2D3D5]">
+            {error.split("\n").map((message, index) => (
+              <li key={index}>{message}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <div className="flex justify-end gap-3 pt-2">
