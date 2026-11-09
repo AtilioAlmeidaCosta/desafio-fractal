@@ -1,8 +1,10 @@
 
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
+
 import connectMongoDB from "@/lib/mongodb";
 import Client from "@/models/Client";
+import { clientSchema } from "@/validators/client";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -17,6 +19,7 @@ export async function PUT(
 
     const { id } = await params;
 
+    // Verifica se o identificador possui formato válido.
     if (!mongoose.isValidObjectId(id)) {
       return NextResponse.json(
         {
@@ -29,35 +32,24 @@ export async function PUT(
 
     const body = await request.json();
 
-    const { name, phone, email, address } = body;
+    // Valida os dados recebidos utilizando o schema do Zod.
+    const validation = clientSchema.safeParse(body);
 
-    if (
-      typeof name !== "string" ||
-      typeof phone !== "string" ||
-      typeof email !== "string" ||
-      typeof address !== "string" ||
-      !name.trim() ||
-      !phone.trim() ||
-      !email.trim() ||
-      !address.trim()
-    ) {
+    if (!validation.success) {
       return NextResponse.json(
         {
           success: false,
-          message: "Todos os campos são obrigatórios.",
+          message: "Dados inválidos. Verifique os campos informados.",
+          errors: validation.error.flatten().fieldErrors,
         },
         { status: 400 }
       );
     }
 
+    // Atualiza somente com os dados aprovados pela validação.
     const updatedClient = await Client.findByIdAndUpdate(
       id,
-      {
-        name: name.trim(),
-        phone: phone.trim(),
-        email: email.trim().toLowerCase(),
-        address: address.trim(),
-      },
+      validation.data,
       {
         new: true,
         runValidators: true,
