@@ -1,69 +1,244 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+import ClientList from "@/components/clients/ClientList";
+import ClientSearch from "@/components/clients/ClientSearch";
+import ClientModal from "@/components/clients/ClientModal";
 import Image from "next/image";
+import type { Client, ClientInput } from "@/types/client";
+
+interface ApiResponse {
+  success: boolean;
+  message?: string;
+  data?: Client | Client[];
+}
+
+async function fetchClientsFromApi(): Promise<Client[]> {
+  const response = await fetch("/api/clients");
+  const result: ApiResponse = await response.json();
+
+  if (!response.ok || !Array.isArray(result.data)) {
+    throw new Error(result.message || "Erro ao carregar clientes.");
+  }
+
+  return result.data;
+}
 
 export default function Home() {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [search, setSearch] = useState("");
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalKey, setModalKey] = useState(0);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initialLoad() {
+      try {
+        const data = await fetchClientsFromApi();
+        if (!cancelled) {
+          setClients(data);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Não foi possível carregar os clientes.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void initialLoad();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filteredClients = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase("pt-BR");
+
+    return clients.filter((client) =>
+      client.name.toLocaleLowerCase("pt-BR").includes(normalizedSearch),
+    );
+  }, [clients, search]);
+
+  async function loadClients() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await fetchClientsFromApi();
+      setClients(data);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível carregar os clientes.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function openNewClientModal() {
+    setSelectedClient(null);
+    setModalKey((previous) => previous + 1);
+    setModalOpen(true);
+  }
+
+  function openEditClientModal(client: Client) {
+    setSelectedClient(client);
+    setModalKey((previous) => previous + 1);
+    setModalOpen(true);
+  }
+
+  async function handleSave(data: ClientInput) {
+    const isEditing = selectedClient !== null;
+
+    const url = isEditing
+      ? `/api/clients/${selectedClient._id}`
+      : "/api/clients";
+
+    const response = await fetch(url, {
+      method: isEditing ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result: ApiResponse = await response.json();
+
+    if (!response.ok || !result.success || !result.data) {
+      throw new Error(result.message || "Não foi possível salvar o cliente.");
+    }
+
+    const savedClient = result.data as Client;
+
+    if (isEditing) {
+      setClients((previous) =>
+        previous.map((client) =>
+          client._id === savedClient._id ? savedClient : client,
+        ),
+      );
+    } else {
+      setClients((previous) => [savedClient, ...previous]);
+    }
+
+    setModalOpen(false);
+    setSelectedClient(null);
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen bg-[#0C0C0C] px-4 py-8 text-[#D2D3D5] sm:px-8 lg:px-12">
+      <div className="mx-auto max-w-7xl">
+        <header className="mb-10 flex flex-col gap-4 border-b border-[#2A2A2A] pb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+              <Image
+                src="/logo-250.png"
+                alt="Fractal Security"
+                width={250}
+                height={80}
+                className="h-auto w-48 object-contain"
+              />
+            <h1 className="text-3xl font-semibold text-white">
+              Gestão de clientes
+            </h1>
+
+            <p className="mt-2 text-sm text-[#96999F]">
+              Consulte e gerencie os cadastros de clientes.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={openNewClientModal}
+            className="rounded-lg bg-[#1CF637] px-5 py-3 text-sm font-semibold text-[#0C0C0C] transition hover:bg-[#7CD420]"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            + Novo cliente
+          </button>
+        </header>
+
+        <section className="mb-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border border-[#2A2A2A] bg-[#141414] p-5">
+            <p className="text-sm text-[#96999F]">Total de clientes</p>
+
+            <p className="mt-2 text-3xl font-semibold text-white">
+              {clients.length}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-[#2A2A2A] bg-[#141414] p-5">
+            <p className="text-sm text-[#96999F]">Resultados da pesquisa</p>
+
+            <p className="mt-2 text-3xl font-semibold text-white">
+              {filteredClients.length}
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-white">
+                Clientes cadastrados
+              </h2>
+
+              <p className="mt-1 text-sm text-[#96999F]">
+                Consulte os registros e edite suas informações.
+              </p>
+            </div>
+
+            <div className="w-full sm:max-w-sm">
+              <ClientSearch value={search} onChange={setSearch} />
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="rounded-lg border border-[#2A2A2A] bg-[#141414] px-6 py-12 text-center text-[#96999F]">
+              Carregando clientes...
+            </div>
+          ) : error ? (
+            <div className="rounded-lg border border-[#E36650]/40 bg-[#E36650]/10 p-6 text-center">
+              <p className="text-sm text-[#E36650]">{error}</p>
+
+              <button
+                type="button"
+                onClick={loadClients}
+                className="mt-4 rounded-lg border border-[#E36650]/50 px-4 py-2 text-sm text-white transition hover:bg-[#E36650]/10"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          ) : (
+            <ClientList
+              clients={filteredClients}
+              onEdit={openEditClientModal}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+          )}
+        </section>
+      </div>
+
+      <ClientModal
+        key={modalKey}
+        isOpen={modalOpen}
+        client={selectedClient}
+        onClose={() => setModalOpen(false)}
+        onSave={handleSave}
+      />
+    </main>
   );
 }
