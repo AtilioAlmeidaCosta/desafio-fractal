@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Papa from "papaparse";
 import type {
   ImportAnalysisResult,
   PendingClientRecord,
@@ -43,10 +44,8 @@ export default function ImportPreview({
       const target = { ...updated[index] };
       target.data = { ...target.data, [field]: value };
 
-      // Revalida em tempo real via Zod
       const parseResult = clientSchema.safeParse(target.data);
       if (parseResult.success) {
-        // Remove erro do campo caso corrigido
         const newErrors = { ...target.errors };
         delete newErrors[field];
         target.errors = newErrors;
@@ -83,60 +82,126 @@ export default function ImportPreview({
     setPendingRecords((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function handleExportErrorsCsv() {
+    // Consolida registros pendentes e duplicados com a justificativa
+    const errorRows = [
+      ...pendingRecords.map((item) => {
+        const motivos = Object.entries(item.errors || {})
+          .map(([campo, errs]) => `${campo.toUpperCase()}: ${errs.join("; ")}`)
+          .join(" | ") || "Dados incompletos ou formato inválido";
+
+        return {
+          Linha_Original: item.rowIndex,
+          Nome: item.data.name || "",
+          Telefone: item.data.phone || "",
+          Email: item.data.email || "",
+          Endereço: item.data.address || "",
+          Motivo_Erro: motivos,
+        };
+      }),
+      ...analysis.duplicates.map((item) => ({
+        Linha_Original: item.rowIndex,
+        Nome: item.data.name || "",
+        Telefone: item.data.phone || "",
+        Email: item.data.email || "",
+        Endereço: item.data.address || "",
+        Motivo_Erro:
+          item.reason === "already_registered"
+            ? "E-mail já cadastrado no banco de dados"
+            : "E-mail duplicado dentro do próprio arquivo CSV",
+      })),
+    ];
+
+    if (errorRows.length === 0) {
+      alert("Não há registros com erro para exportar.");
+      return;
+    }
+
+    const csvContent = "\uFEFF" + Papa.unparse(errorRows);
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `clientes_inconsistentes_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   async function handleFinalSubmit() {
     const clientsToImport = validRecords.map((r) => r.data);
     await onConfirm(clientsToImport);
   }
 
+  const hasIssues = pendingRecords.length > 0 || analysis.duplicates.length > 0;
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Cards de Resumo */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <button
-          type="button"
-          onClick={() => setActiveTab("valid")}
-          className={`flex flex-col rounded-lg border p-4 text-left transition ${
-            activeTab === "valid"
-              ? "border-[#1CF637] bg-[#1CF637]/10"
-              : "border-[#2A2A2A] bg-[#141414] hover:border-[#3A3A3A]"
-          }`}
-        >
-          <span className="text-xs font-medium text-[#96999F]">Prontos para importar</span>
-          <span className="mt-1 text-2xl font-bold text-white">
-            {validRecords.length}
-          </span>
-        </button>
+      {/* Resumo e Botão de Exportação de Erros */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("valid")}
+            className={`flex flex-col rounded-lg border p-4 text-left transition ${
+              activeTab === "valid"
+                ? "border-[#1CF637] bg-[#1CF637]/10"
+                : "border-[#2A2A2A] bg-[#141414] hover:border-[#3A3A3A]"
+            }`}
+          >
+            <span className="text-xs font-medium text-[#96999F]">Prontos para importar</span>
+            <span className="mt-1 text-2xl font-bold text-white">
+              {validRecords.length}
+            </span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("pending")}
-          className={`flex flex-col rounded-lg border p-4 text-left transition ${
-            activeTab === "pending"
-              ? "border-amber-500 bg-amber-500/10"
-              : "border-[#2A2A2A] bg-[#141414] hover:border-[#3A3A3A]"
-          }`}
-        >
-          <span className="text-xs font-medium text-[#96999F]">Pendentes de revisão</span>
-          <span className="mt-1 text-2xl font-bold text-amber-400">
-            {pendingRecords.length}
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("pending")}
+            className={`flex flex-col rounded-lg border p-4 text-left transition ${
+              activeTab === "pending"
+                ? "border-amber-500 bg-amber-500/10"
+                : "border-[#2A2A2A] bg-[#141414] hover:border-[#3A3A3A]"
+            }`}
+          >
+            <span className="text-xs font-medium text-[#96999F]">Pendentes de revisão</span>
+            <span className="mt-1 text-2xl font-bold text-amber-400">
+              {pendingRecords.length}
+            </span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("duplicates")}
-          className={`flex flex-col rounded-lg border p-4 text-left transition ${
-            activeTab === "duplicates"
-              ? "border-[#E36650] bg-[#E36650]/10"
-              : "border-[#2A2A2A] bg-[#141414] hover:border-[#3A3A3A]"
-          }`}
-        >
-          <span className="text-xs font-medium text-[#96999F]">Duplicados / Ignorados</span>
-          <span className="mt-1 text-2xl font-bold text-[#E36650]">
-            {analysis.duplicates.length}
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("duplicates")}
+            className={`flex flex-col rounded-lg border p-4 text-left transition ${
+              activeTab === "duplicates"
+                ? "border-[#E36650] bg-[#E36650]/10"
+                : "border-[#2A2A2A] bg-[#141414] hover:border-[#3A3A3A]"
+            }`}
+          >
+            <span className="text-xs font-medium text-[#96999F]">Duplicados / Ignorados</span>
+            <span className="mt-1 text-2xl font-bold text-[#E36650]">
+              {analysis.duplicates.length}
+            </span>
+          </button>
+        </div>
       </div>
+
+      {hasIssues && (
+        <div className="flex items-center justify-between rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-3 text-xs text-[#96999F]">
+          <span>
+            Prefere que a equipe comercial corrija externamente?
+          </span>
+          <button
+            type="button"
+            onClick={handleExportErrorsCsv}
+            className="flex items-center gap-1.5 rounded border border-[#2A2A2A] bg-[#141414] px-3 py-1.5 font-medium text-white transition hover:border-amber-400 hover:text-amber-400"
+          >
+            ↓ Baixar planilha de erros (.csv)
+          </button>
+        </div>
+      )}
 
       {/* Conteúdo das Abas */}
       <div className="max-h-[380px] overflow-y-auto rounded-lg border border-[#2A2A2A] bg-[#141414] p-4">
@@ -172,7 +237,7 @@ export default function ImportPreview({
           </div>
         )}
 
-        {/* Aba Pendentes (Editável) */}
+        {/* Aba Pendentes */}
         {activeTab === "pending" && (
           <div className="space-y-4">
             {pendingRecords.length === 0 ? (
