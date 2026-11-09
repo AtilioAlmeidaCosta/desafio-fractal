@@ -53,7 +53,7 @@ export default function Home() {
           setError(
             error instanceof Error
               ? error.message
-              : "Não foi possível carregar os clientes."
+              : "Não foi possível carregar os clientes.",
           );
         }
       } finally {
@@ -74,7 +74,7 @@ export default function Home() {
     const normalizedSearch = search.trim().toLocaleLowerCase("pt-BR");
 
     return clients.filter((client) =>
-      client.name.toLocaleLowerCase("pt-BR").includes(normalizedSearch)
+      client.name.toLocaleLowerCase("pt-BR").includes(normalizedSearch),
     );
   }, [clients, search]);
 
@@ -89,7 +89,7 @@ export default function Home() {
       setError(
         error instanceof Error
           ? error.message
-          : "Não foi possível carregar os clientes."
+          : "Não foi possível carregar os clientes.",
       );
     } finally {
       setLoading(false);
@@ -135,13 +135,13 @@ export default function Home() {
       if (errors) {
         const messages = Object.entries(errors).flatMap(
           ([field, fieldErrors]) =>
-            fieldErrors.map((message) => `${field}: ${message}`)
+            fieldErrors.map((message) => `${field}: ${message}`),
         );
 
         throw new Error(
           messages.length > 0
             ? messages.join("\n")
-            : result.message || "Não foi possível salvar o cliente."
+            : result.message || "Não foi possível salvar o cliente.",
         );
       }
 
@@ -153,8 +153,8 @@ export default function Home() {
     if (isEditing) {
       setClients((previous) =>
         previous.map((client) =>
-          client._id === savedClient._id ? savedClient : client
-        )
+          client._id === savedClient._id ? savedClient : client,
+        ),
       );
     } else {
       setClients((previous) => [savedClient, ...previous]);
@@ -186,6 +186,14 @@ export default function Home() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="/api/clients/export"
+              download
+              className="rounded-lg border border-[#2A2A2A] bg-[#141414] px-5 py-3 text-sm font-semibold text-[#D2D3D5] transition hover:border-white hover:text-white"
+            >
+              Exportar CSV
+            </a>
+
             <button
               type="button"
               onClick={() => setImportModalOpen(true)}
